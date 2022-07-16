@@ -20,7 +20,6 @@ class MainActivity : AppCompatActivity() {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         setContentView(R.layout.activity_main)
 
-        Firebase.database.setPersistenceEnabled(true)
         mAuth = FirebaseAuth.getInstance()
         val user = mAuth.currentUser
 
