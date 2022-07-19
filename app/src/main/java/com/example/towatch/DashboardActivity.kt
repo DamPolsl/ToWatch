@@ -14,6 +14,7 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.bumptech.glide.Glide
 import com.example.towatch.databinding.ActivityDashboardBinding
+import com.firebase.ui.auth.AuthUI
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
@@ -60,7 +61,7 @@ class DashboardActivity : AppCompatActivity() {
         headerView.findViewById<TextView>(R.id.tv_name).text = mAuth.currentUser?.displayName
         headerView.findViewById<TextView>(R.id.tv_email).text = mAuth.currentUser?.email
         navView.findViewById<MaterialButton>(R.id.btn_logout).setOnClickListener {
-            mAuth.signOut()
+            AuthUI.getInstance().signOut(this)
             val intent = Intent(this, SignInActivity::class.java)
             startActivity(intent)
             finish()
