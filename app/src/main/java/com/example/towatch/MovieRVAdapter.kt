@@ -1,7 +1,5 @@
 package com.example.towatch
 
-import android.util.Log
-import android.util.SparseBooleanArray
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,11 +7,9 @@ import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 
 class MovieRVAdapter(
     private val onMovieClicked: (MovieRVAdapter.MovieViewHolder, Movie, Int) -> Unit
@@ -55,6 +51,8 @@ class MovieRVAdapter(
             .asBitmap()
             .fitCenter()
             .load(current.poster)
+            .placeholder(ProgressDrawable(holder.itemView.context))
+            .error(R.drawable.ic_image_not_supported)
             .into(holder.posterIV)
         holder.movieDescriptionTV.text = current.plot
         if(holder.adapterPosition > lastIndex){

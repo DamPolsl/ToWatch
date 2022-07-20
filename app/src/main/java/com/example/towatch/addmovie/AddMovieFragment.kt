@@ -1,5 +1,7 @@
 package com.example.towatch.addmovie
 
+import android.app.Activity
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -7,19 +9,12 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
-import androidx.appcompat.widget.Toolbar
+import android.view.inputmethod.InputMethodManager
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.android.volley.Request
-import com.android.volley.Response
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
 import com.example.towatch.*
 import com.example.towatch.BuildConfig
 import com.example.towatch.R
@@ -28,8 +23,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
-import org.json.JSONException
-import org.json.JSONObject
+import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 
 class AddMovieFragment : Fragment(){
     private lateinit var viewModel: AddMovieViewModel
@@ -93,11 +89,11 @@ class AddMovieFragment : Fragment(){
         binding.rvMovies.hasFixedSize()
         binding.rvMovies.layoutManager = LinearLayoutManager(requireContext())
 
-        binding.etTitle.setOnKeyListener(View.OnKeyListener { v, keyCode, event ->
+        binding.etTitle.setOnKeyListener(View.OnKeyListener { _, keyCode, event ->
             if(keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP) {
                 binding.etTitle.setText(binding.etTitle.text.toString().trim())
                 binding.etTitle.clearFocus()
-                v.hideKeyboard()
+                hideKeyboard()
                 binding.llProgress.visibility = View.VISIBLE
                 fetchMovies()
                 adapter.setData(moviesArrayList)
@@ -107,7 +103,7 @@ class AddMovieFragment : Fragment(){
         })
 
         binding.btnSearch.setOnClickListener {
-            it.hideKeyboard()
+            hideKeyboard()
             binding.etTitle.clearFocus()
             binding.llProgress.visibility = View.VISIBLE
             fetchMovies()
@@ -126,74 +122,74 @@ class AddMovieFragment : Fragment(){
 
     private fun fetchMovies(){
         adapter.lastIndex = -1
+        adapter.lastSelected = -1
+        adapter.selectedMovie = Movie()
         moviesArrayList.clear()
-        val searchTitle: String = binding.etTitle.text.toString()
-        val url = "https://www.omdbapi.com/?apikey=${BuildConfig.API_KEY}&type=movie&s=${searchTitle}"
-        val queue = Volley.newRequestQueue(requireContext())
+        val title = binding.etTitle.text.toString().trim()
 
-        val stringRequest = StringRequest(
-            Request.Method.GET, url,
-            { response ->
-                try {
-                    val jsonResponse = JSONObject(response)
-                    val moviesArray = jsonResponse.getJSONArray("Search")
-                    (0..moviesArray.length()).forEach { i ->
-                        val jsonMovie: JSONObject = moviesArray.getJSONObject(i)
-                        val movie = Movie(
-                            jsonMovie.getString("Poster"),
-                            jsonMovie.getString("Year"),
-                            jsonMovie.getString("Title"),
-                            plot = "",
-                            watched=false,
-                            jsonMovie.getString("imdbID")
-                        )
-                        moviesArrayList.add(movie)
-                        adapter.notifyDataSetChanged()
-                    }
-                } catch (e: JSONException){
-                    Log.v(DashboardActivity.TAG, e.toString())
-                    e.printStackTrace()
-                }
+        lifecycleScope.launch{
+            val response = try {
+                RetrofitInstance.api.getMoviesByTitle(title)
+            } catch (e: IOException){
+                Log.e("AddMovieFragment", "IOException: ${e.localizedMessage}")
                 binding.llProgress.visibility = View.GONE
-            },
-            {
-                Toast.makeText(requireContext(), it.localizedMessage, Toast.LENGTH_SHORT).show()
-            })
-
-        // Add the request to the RequestQueue.
-        queue.add(stringRequest)
+                return@launch
+            } catch (e: HttpException){
+                Log.e("AddMovieFragment", "HttpException: ${e.localizedMessage}")
+                binding.llProgress.visibility = View.GONE
+                return@launch
+            }
+            if(response.isSuccessful){
+                response.body()?.movieList?.let {
+                    moviesArrayList = ArrayList(it)
+                    adapter.setData(moviesArrayList)
+                    adapter.notifyDataSetChanged()
+                }
+            } else {
+                Log.e("AddMovieFragment", "Response not successful")
+            }
+            binding.llProgress.visibility = View.GONE
+        }
     }
 
     private fun addMovie(movie: Movie){
         getDescription(movie)
     }
     private fun getDescription(movie: Movie){
-        val url = "https://www.omdbapi.com/?apikey=${BuildConfig.API_KEY}&type=movie&i=${movie.id}"
-        val queue = Volley.newRequestQueue(requireContext())
-
-        val stringRequest = StringRequest(
-            Request.Method.GET, url,
-            { response ->
-                try {
-                    val jsonResponse = JSONObject(response)
-                    movie.plot = jsonResponse.getString("Plot")
-                    moviesRef.child(movie.id).setValue(movie)
-                    binding.llProgress.visibility = View.GONE
-                    view?.findNavController()?.popBackStack()
-                } catch (e: JSONException){
-                    Log.v(DashboardActivity.TAG, e.toString())
-                    binding.llProgress.visibility = View.GONE
-                    e.printStackTrace()
-                }
-            },
-            {
-                Toast.makeText(requireContext(), it.localizedMessage, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch{
+            val response = try {
+                RetrofitInstance.api.getMovieWithDetailsById(movie.id)
+            } catch (e: IOException){
+                Log.e("AddMovieFragment", "IOException: ${e.localizedMessage}")
                 binding.llProgress.visibility = View.GONE
-            })
-
-        // Add the request to the RequestQueue.
-        queue.add(stringRequest)
+                return@launch
+            } catch (e: HttpException){
+                Log.e("AddMovieFragment", "HttpException: ${e.localizedMessage}")
+                binding.llProgress.visibility = View.GONE
+                return@launch
+            }
+            if (response.isSuccessful){
+                response.body()?.let {
+                    Log.e("AddMovieFragment", it.toString())
+                    movie.plot = it.plot
+                    moviesRef.child(movie.id).setValue(movie)
+                    view?.findNavController()?.popBackStack()
+                }
+            } else {
+                Log.e("AddMovieFragment", "Response not successful")
+            }
+            binding.llProgress.visibility = View.GONE
+        }
     }
 }
 
-fun View.hideKeyboard() = ViewCompat.getWindowInsetsController(this)?.hide(WindowInsetsCompat.Type.ime())
+// extension functions to hide the onscreen keyboard
+
+fun Fragment.hideKeyboard() {
+    view?.let { activity?.hideKeyboard(it) }
+}
+
+fun Context.hideKeyboard(view: View) {
+    val inputMethodManager = getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
+    inputMethodManager.hideSoftInputFromWindow(view.windowToken, 0)
+}
