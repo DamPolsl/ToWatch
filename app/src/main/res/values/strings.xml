@@ -17,11 +17,13 @@
 
     <string name="open">Open</string>
     <string name="close">Close</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+
     <string name="fab_add_content_description">Button to add movies.</string>
     <string name="movie_title_hint">Movie title...</string>
     <string name="search">Search</string>
     <string name="have_you_seen_this_movie">Have you seen this movie?</string>
     <string name="add_movie">Add movie</string>
+    <string name="General_error_message">Oops! Something has gone wrong!</string>
+    <string name="delete_movie">Delete movie</string>
+    <string name="movie_poster_description">Movie poster image</string>
 </resources>
